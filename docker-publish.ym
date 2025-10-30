@@ -1,0 +1,66 @@
+# 此工作流文件的名称，将显示在 GitHub 的 "Actions" 选项卡中
+name: Docker Image CI
+
+# 触发工作流的事件
+on:
+  push:
+    # 仅在 main 分支有推送（push）时触发
+    branches: [ "main" ]
+  # 您也可以添加 pull_request 来在PR时仅构建以进行测试
+  # pull_request:
+  #   branches: [ "main" ]
+
+jobs:
+  # 定义一个名为 build-and-push 的作业
+  build-and-push:
+    # 作业运行在最新版的 Ubuntu 虚拟机上
+    runs-on: ubuntu-latest
+
+    # 授予此作业推送到 GHCR 的权限
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      # 第一步：检出（Checkout）您的仓库代码
+      - name: Check out repository
+        # 使用官方的 checkout action
+        uses: actions/checkout@v4
+
+      # 第二步：登录到 GitHub Container Registry (GHCR)
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          # 注册中心地址
+          registry: ghcr.io
+          # 用户名是您的 GitHub 用户名或组织名
+          username: ${{ github.repository_owner }}
+          # 密码使用 GitHub 自动生成的 GITHUB_TOKEN
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 第三步：提取 Docker 镜像的元数据（如标签和标签）
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          # 将镜像命名为 ghcr.io/YOUR-USERNAME/YOUR-REPO-NAME
+          images: ghcr.io/${{ github.repository }}
+          # 这将自动为您生成很好的标签，例如：
+          # - "latest"（最新的）
+          # - "main"（基于分支名）
+          # - "sha-xxxxxxx"（基于 commit SHA）
+
+      # 第四步：构建并推送 Docker 镜像
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          # Docker build 的上下文路径（. 表示仓库根目录）
+          context: .
+          # Dockerfile 的路径（默认为 ./Dockerfile，符合您的项目）
+          file: ./Dockerfile
+          # 推送镜像到注册中心
+          push: true
+          # 使用上一步 "meta" 中生成的标签
+          tags: ${{ steps.meta.outputs.tags }}
+          # 使用上一步 "meta" 中生成的标签
+          labels: ${{ steps.meta.outputs.labels }}
